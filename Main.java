@@ -18,25 +18,9 @@ import java.util.*;
 import java.io.*;
 
 public class Main {
-	static boolean quit;
 	// static variables and constants only here.
+	static boolean quit;
 	static ArrayList<String> checkedWords = new ArrayList<String>();
-	static Set<String> dictSet;
-	static ArrayList<Vertex> dictArray;
-	static ArrayList<LinkedList<String>> adjacencyList;
-	
-	static class Vertex{
-		boolean discovered;
-		String value;
-		Vertex parent;
-		
-		Vertex(String s){
-			this.discovered = false;
-			this.value = s;
-			this.parent = null;
-		}
-	}
-
 	
 	public static void main(String[] args) throws Exception {
 		
@@ -63,7 +47,8 @@ public class Main {
 			if(!quit){
 				String start = startEnd.get(0);
 				String end = startEnd.get(1);
-				ArrayList<String> wordLadder = getWordLadderDFS(start, end);
+				//ArrayList<String> wordLadder = getWordLadderDFS(start, end);
+				ArrayList<String> wordLadder = getWordLadderBFS(start, end);
 				if(wordLadder.size() > 2){
 					printLadder(wordLadder);
 				}
@@ -78,30 +63,6 @@ public class Main {
 		// initialize your static variables or constants here.
 		// We will call this method before running our JUNIT tests. So call it only once at the start of main.
 		quit = false;
-		
-		dictSet = makeDictionary();
-		dictArray = new ArrayList<Vertex>();
-		for (String s : dictSet){
-			dictArray.add(new Vertex (s));
-		}
-		
-		adjacencyList = new ArrayList<LinkedList<String>>();
-		for (int i = 0; i < dictArray.size(); i ++){
-			adjacencyList.add(new LinkedList<String>());
-			String node = dictArray.get(i).value;
-
-			for (int j = 0; j < dictSet.size(); j ++){
-				String test = dictArray.get(j).value;
-				int common = 0;
-				for (int k = 0; k < test.length(); k ++){
-					if (node.charAt(k) == test.charAt(k)) common ++;
-				}
-        
-				if (common == test.value.length() - 1) {
-					adjacencyList.get(i).add(test);
-				}
-			}
-		}
 	}
 
 	/**
@@ -112,16 +73,19 @@ public class Main {
 	public static ArrayList<String> parse(Scanner keyboard) {
 		ArrayList<String> retList = new ArrayList<String>();
 		String input1 = keyboard.next();
-		if(input1.equals("/quit")){
+		if (input1.equals("/quit")){
 			quit = true;
 			return null;
 		}
-		else{
-			retList.add(input1);
-			String input2 = keyboard.next();
-			retList.add(input2);
-			return retList;
+		String input2 = keyboard.next();
+		if (input2.equals("/quit")){
+			quit = true;
+			return null;
 		}
+		
+		retList.add(input1.toUpperCase());
+		retList.add(input2.toUpperCase());
+		return retList;
 	}
 
 	public static ArrayList<String> getWordLadderDFS(String start, String end) {
@@ -135,65 +99,38 @@ public class Main {
 		return retPath;
 	}
 	
-    public static ArrayList<String> getWordLadderBFS(String start, String end) {
-		Queue<Vertex> queue = new LinkedList<Vertex>();
-		ArrayList<String> ladder = new ArrayList<String>();
+	public static ArrayList<String> getWordLadderBFS(String start, String end) {
+	   Set<String> dict = makeDictionary();
+	   if (!dict.contains(start) || !dict.contains(end)) return new ArrayList<String>();
+	   List<String> path = new LinkedList<String>();
+	   path.add(start);
+	   dict.remove(start);
+	   
+	   Queue<Ladder> queue = new LinkedList<Ladder>();
+	   queue.add(new Ladder(path, 1, start));
+	   while (!queue.isEmpty() && !queue.peek().equals(end)){
+		   Ladder test = queue.remove();
+		   
+		   if (end.equals(test.getFinalWord())) return new ArrayList<String>(test.getPath());
+		   
+		   Iterator<String> i = dict.iterator();
+		   while (i.hasNext()){
+			   String string = i.next();
+			   
+			   if (differByOne(string, test.getFinalWord())){
+				   List<String> list = new LinkedList<String>(test.getPath());
+				   list.add(string);
+				   queue.add(new Ladder (list, test.getLength()+1, string));
+				   i.remove();
+			   }
+		   }
+
+	   }
+	   if (queue.isEmpty()) return new ArrayList<String>();
+	   return new ArrayList<String>(queue.peek().getPath());
 		
-		// Reset graph
-		for (Vertex v : dictArray){
-			v.discovered = false;
-			v.parent = null;
-		}
-		
-		// Traverse tree and establish parents
-		Vertex startVertex = new Vertex(start);
-		int startIdx = dictArray.indexOf(startVertex); // if start not in dictionary, startIdx == -1
-		dictArray.get(startIdx).discovered = true;
-		queue.add(dictArray.get(startIdx));
-		
-		boolean vertexFound = false;
-		while (!queue.isEmpty() && !vertexFound){
-			Vertex u = queue.remove();
-			if (u.value == end) vertexFound = true;
-			
-			int idx = dictArray.indexOf(u);
-			//for (int i = 0; i < adjacencyList.get(idx).size(); i ++){
-			for (String adjacentString : adjacencyList.get(idx)){
-				Vertex check = new Vertex (adjacentString);
-				int checkIdx = dictArray.indexOf(check);
-				if (dictArray.get(checkIdx).discovered == false){
-					dictArray.get(checkIdx).discovered = true;
-					dictArray.get(checkIdx).parent = u;
-					queue.add(dictArray.get(checkIdx));
-				}
-			}
-		}
-		
-		if (!vertexFound) return ladder;
-		else return buildLadderBFS(new Vertex(start), new Vertex(end), ladder);
-		//Set<String> dict = makeDictionary();
-		
-		
-		
-		//return null; // replace this line later with real return
 	}
     
-    public static ArrayList<String> buildLadderBFS(Vertex start, Vertex end, ArrayList<String> ladder){
-    	if (end.value == start.value){
-    		ladder.add(end.value);
-    		return ladder;
-    	}
-    	
-    	//int startIdx = dictArray.indexOf(start);
-    	int endIdx = dictArray.indexOf(end);
-    	
-    	if (dictArray.get(endIdx).parent == null) return null;
-    	ladder = buildLadderBFS(start, dictArray.get(endIdx).parent, ladder);
-    	ladder.add(end.value);
-    	return ladder;
-    	
-    }
-
 	public static Set<String> makeDictionary() {
 
 		Set<String> words = new HashSet<String>();
@@ -260,3 +197,4 @@ public class Main {
 			return false;
 		}
 	}
+}
